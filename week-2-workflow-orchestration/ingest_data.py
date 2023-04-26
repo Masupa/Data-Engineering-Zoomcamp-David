@@ -5,6 +5,7 @@ import sqlalchemy as db
 
 from prefect import flow, task
 from prefect.tasks import task_input_hash
+from prefect_sqlalchemy import SqlAlchemyConnector
 
 from dotenv import load_dotenv
 
@@ -53,27 +54,22 @@ def transform_data(df):
 
 
 @task(log_prints=True, retries=3)
-def ingest_data(host, port, user, password, db_name, table_name, df):
+def ingest_data(table_name, df):
     """
         Doc String...
     """
 
     # Connect to Postgres DB
-    engine = db.create_engine(f"postgresql://{user}:{password}@{host}:{port}/{db_name}")
-
-    # Ingest DB to Postgres DB
-    df.to_sql(name=table_name, con=engine, index=False, if_exists="append")
+    with SqlAlchemyConnector.load("postgres-connector") as database_block:
+        engine = database_block.get_connection(begin=False)
+        # Ingest DB to Postgres DB
+        df.to_sql(name=table_name, con=engine, index=False, if_exists="append")
 
     print(f"Finished ingesting data into the postgres database: Size={df.shape[0]}")
 
 
 @flow(name="Ingest Flow")
 def main_flow(table_name: str):
-    host = os.getenv("host")
-    port = os.getenv("port")
-    user = os.getenv("user")
-    password = os.getenv("password")
-    db_name = os.getenv("db_name")
     table_name = os.getenv("table_name")
 
     # Extract
@@ -82,7 +78,7 @@ def main_flow(table_name: str):
     # Transform
     data = transform_data(raw_data)
     # Load
-    ingest_data(host, port, user, password, db_name, table_name, data)
+    ingest_data(table_name, data)
 
 
 if __name__ == "__main__":
