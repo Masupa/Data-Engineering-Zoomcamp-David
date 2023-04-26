@@ -2,46 +2,73 @@
 import os
 import pandas as pd
 import sqlalchemy as db
+
 from prefect import flow, task
+from prefect.tasks import task_input_hash
+
 from dotenv import load_dotenv
+
+from datetime import timedelta
 
 # Load env var in OS namespace
 load_dotenv()
 
 
+@task(log_prints=True, retries=3, cache_key_fn=task_input_hash, cache_expiration=timedelta(days=1))
+def extract_data():
+    """
+        Doc String...
+    """
+    # Import CSV file
+    df_iter = pd.read_csv("Data/yellow_tripdata_2021-07.csv.gz", compression="gzip", iterator=True, chunksize=100_000)
+
+    df = None
+
+    # loop through chunks in `df_iter`
+    for df_ in df_iter:
+        if df is None:
+            df = df_
+        else:
+            df = pd.concat([df, df_])
+
+    return df
+
+
+@task(log_prints=True)
+def transform_data(df):
+    """
+        Doc String
+    """
+
+    # Remove rows with `Passenger count` at zero
+    print(f"pre: missing passenger count: {df['passenger_count'].isin([0]).sum()}")
+    df = df[df["passenger_count"] != 0]
+    print(f"post: missing passenger count: {df['passenger_count'].isin([0]).sum()}")
+
+    # Convert `date` variables dtype to datetime
+    df["tpep_pickup_datetime"] = pd.to_datetime(df["tpep_pickup_datetime"])
+    df["tpep_dropoff_datetime"] = pd.to_datetime(df["tpep_dropoff_datetime"])
+
+    return df
+
+
 @task(log_prints=True, retries=3)
-def ingest_data(host, port, user, password, db_name, table_name):
+def ingest_data(host, port, user, password, db_name, table_name, df):
     """
         Doc String...
     """
 
-    try:
-        # Connect to DB
-        engine = db.create_engine(f"postgresql://{user}:{password}@{host}:{port}/{db_name}")
-    except Exception as err:
-        print(err)
-        return err
-    
-    # Import CSV file
-    df_iter = pd.read_csv("Data/yellow_tripdata_2021-07.csv.gz", compression="gzip", iterator=True, chunksize=100_000)
+    # Connect to Postgres DB
+    engine = db.create_engine(f"postgresql://{user}:{password}@{host}:{port}/{db_name}")
 
-    # Iterate through `DataFrames`
-    for df in df_iter:
-        # Convert `date` dtypes to `datetime`
-        df["tpep_pickup_datetime"] = pd.to_datetime(df["tpep_pickup_datetime"])
-        df["tpep_dropoff_datetime"] = pd.to_datetime(df["tpep_dropoff_datetime"])
+    # Ingest DB to Postgres DB
+    df.to_sql(name=table_name, con=engine, index=False, if_exists="append")
 
-        # Ingest DB to Postgres DB
-        df.to_sql(name=table_name, con=engine, index=False, if_exists="append")
-
-        # log results
-        print(f"Ingesting a chunk of data ------- Size: {df.shape[0]}")
-
-    print("Finished ingesting data into the postgres database")
+    print(f"Finished ingesting data into the postgres database: Size={df.shape[0]}")
 
 
 @flow(name="Ingest Flow")
-def main_flow():
+def main_flow(table_name: str):
     host = os.getenv("host")
     port = os.getenv("port")
     user = os.getenv("user")
@@ -49,8 +76,14 @@ def main_flow():
     db_name = os.getenv("db_name")
     table_name = os.getenv("table_name")
 
-    ingest_data(host, port, user, password, db_name, table_name)
+    # Extract
+    raw_data = extract_data()
+    print(type(raw_data), raw_data.shape)
+    # Transform
+    data = transform_data(raw_data)
+    # Load
+    ingest_data(host, port, user, password, db_name, table_name, data)
 
 
 if __name__ == "__main__":
-    main_flow()
+    main_flow(table_name="yellow_taxi_trips")
