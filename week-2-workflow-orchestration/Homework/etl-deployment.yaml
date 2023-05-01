@@ -1,0 +1,68 @@
+###
+### A complete description of a Prefect Deployment for flow 'Ingest Green Taxi into GCS'
+###
+name: Ingest_Web_to_GCS
+description: load data into GCS
+version: 296d96cf694baf59dceeec59d9271da4
+# The work queue that will handle this deployment's runs
+work_queue_name: default
+work_pool_name: default-agent-pool
+tags:
+- github-block
+parameters: {}
+schedule: null
+is_schedule_active: true
+infra_overrides: {}
+
+###
+### DO NOT EDIT BELOW THIS LINE
+###
+flow_name: Ingest Green Taxi into GCS
+manifest_path: null
+infrastructure:
+  type: process
+  env: {}
+  labels: {}
+  name: null
+  command: null
+  stream_output: true
+  working_dir: null
+  _block_document_id: 12ea82cb-f2de-49b6-b493-ba2e9c036785
+  _block_document_name: anonymous-8b7c82a4-9155-4a7b-85b2-a149aedffa21
+  _is_anonymous: true
+  block_type_slug: process
+  _block_type_slug: process
+storage:
+  repository: https://github.com/Masupa/Data-Engineering-Zoomcamp-David/tree/main/week-2-workflow-orchestration/Homework
+  reference: null
+  access_token: '**********'
+  include_git_objects: true
+  _block_document_id: 8b7ffc0a-5320-4202-9bc4-4971dd72294d
+  _block_document_name: github-block
+  _is_anonymous: false
+  block_type_slug: github
+  _block_type_slug: github
+path: ''
+entrypoint: flows/load_to_gcs/etl_web_to_gcs.py:etl
+parameter_openapi_schema:
+  title: Parameters
+  type: object
+  properties:
+    data_url:
+      title: data_url
+      position: 0
+      type: string
+    color:
+      title: color
+      position: 1
+      type: string
+    file_name:
+      title: file_name
+      position: 2
+      type: string
+  required:
+  - data_url
+  - color
+  - file_name
+  definitions: null
+timestamp: '2023-05-01T17:37:58.510385+00:00'
