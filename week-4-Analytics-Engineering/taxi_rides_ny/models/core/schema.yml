@@ -1,0 +1,14 @@
+version: 2
+
+models:
+  - name: dim_zones
+    columns:
+      - name: LocationID
+        tests:
+          - unique
+          - not_null
+      - name: Service_Zone
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Green Zone', 'Yellow Zone', 'EWR', 'Airports', 'N/A']
